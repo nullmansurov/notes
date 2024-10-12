@@ -3,18 +3,18 @@ const path = require('path');
 
 function createWindow() {
     const win = new BrowserWindow({
-        width: 1400,
+        width: 800,
         height: 600,
         webPreferences: {
-            nodeIntegration: true,  // Включаем интеграцию Node.js
-            contextIsolation: false // Отключаем изоляцию контекста
+            nodeIntegration: true,
+            contextIsolation: false
         },
         icon: path.join(__dirname, 'favicon.ico')
     });
 
     win.loadFile('index.html');
 
-    // Переопределяем стандартные браузерные функции прямо в рендерере
+    // Переопределение функции prompt для использования Electron
     win.webContents.executeJavaScript(`
         window.prompt = (message, defaultValue = '') => {
             const { ipcRenderer } = require('electron');
@@ -41,20 +41,34 @@ app.on('activate', () => {
     }
 });
 
-// Обработчик для вызова prompt через Electron
+// Обработчик для вызова кастомного prompt
 ipcMain.handle('show-prompt-dialog', async (event, message, defaultValue) => {
-    const result = await dialog.showMessageBox({
-        type: 'question',
-        buttons: ['OK', 'Cancel'],
-        defaultId: 0,
-        cancelId: 1,
-        title: 'Prompt',
-        message: message,
-        input: true,
-        detail: 'Enter a value:', // Подпись для поля ввода
-        input: defaultValue // Значение по умолчанию
+    const promptWindow = new BrowserWindow({
+        width: 400,
+        height: 200,
+        resizable: false,
+        modal: true,
+        parent: BrowserWindow.getFocusedWindow(),
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
     });
 
-    // Возвращаем значение, если нажали OK, или null, если нажали Cancel
-    return result.response === 0 ? result.inputValue : null;
+    promptWindow.loadURL(`data:text/html,
+        <html>
+        <body>
+            <h1>${message}</h1>
+            <input type="text" id="input" value="${defaultValue}" />
+            <button onclick="require('electron').ipcRenderer.send('prompt-response', document.getElementById('input').value)">OK</button>
+            <button onclick="require('electron').ipcRenderer.send('prompt-response', null)">Cancel</button>
+        </body>
+        </html>`);
+
+    return new Promise((resolve) => {
+        ipcMain.once('prompt-response', (event, result) => {
+            promptWindow.close();
+            resolve(result);
+        });
+    });
 });
