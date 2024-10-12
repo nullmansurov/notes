@@ -1,0 +1,96 @@
+name: Build Creative Space
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Set GitHub Token
+        run: echo "GH_TOKEN=${{ secrets.maintoken }}" >> $GITHUB_ENV
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '20.18.0'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build for Windows
+        env:
+          GH_TOKEN: ${{ secrets.maintoken }}  # Передача токена
+        run: npm run build -- --win
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: creative-space-build-windows
+          path: |
+            dist/*.exe
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Set GitHub Token
+        run: echo "GH_TOKEN=${{ secrets.maintoken }}" >> $GITHUB_ENV
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '20.18.0'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build for macOS
+        run: npm run build -- --mac
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: creative-space-build-macos
+          path: |
+            dist/*.dmg
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Set GitHub Token
+        run: echo "GH_TOKEN=${{ secrets.maintoken }}" >> $GITHUB_ENV
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '20.18.0'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build for Linux
+        run: npm run build -- --linux
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: creative-space-build-linux
+          path: |
+            dist/*.AppImage
