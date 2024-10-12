@@ -1,0 +1,54 @@
+{
+  "name": "notes",
+  "version": "1.0.0",
+  "description": "A notes",
+  "author": {
+  "name": "Scyload",
+  "email": "arstailev@gmail.com"
+  },
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^32.2.0",
+    "electron-builder": "^25.1.7"
+  },
+  "build": {
+    "appId": "scyload.notes",
+    "productName": "Creative Space",
+    "files": [
+      "main.js",
+      "package.json",
+      "index.html",
+      "assets/fv_p9.ico",
+      "assets/icon.icns",
+      "assets/icon.png"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/fv_p9.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "assets/icon.png",
+       "maintainer": "Scyload <arstailev@gmail.com>"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
