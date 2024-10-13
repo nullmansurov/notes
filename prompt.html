@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <h2>File Name:</h2>
+    <input type="text" id="promptInput" />
+    <button onclick="submitPrompt()">Send</button>
+
+    <script>
+        function submitPrompt() {
+            const input = document.getElementById('promptInput').value;
+            
+            // Отправляем данные в основной процесс
+            window.electronAPI.sendPromptInput(input);
+            promptWindow.close(); // Закрываем окно после получения ответа
+            promptWindow = null;
+        }
+    </script>
+</body>
+</html>

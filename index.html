@@ -1,75 +1,640 @@
-const { app, BrowserWindow, Menu, ipcMain } = require('electron');
-const path = require('path');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes</title>
+    <link rel="icon" href="fav.ico" type="image/x-icon">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+<style>
+        body {
+            font-family: Montserrat, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+            background-color: #f0f0f0;
+            color: #333;
+            box-sizing: border-box;
+        }
 
-function createWindow() {
-    const win = new BrowserWindow({
-        width: 800,
-        height: 600,
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
-        },
-        icon: path.join(__dirname, 'favicon.ico')
-    });
+        #hideSidebarButton, #showSidebarButton {
+            position: absolute;
+            top: 10px;
+            background-color: #2980b9;
+            color: white;
+            border: none;
+            cursor: pointer;
+            padding: 8px 12px;
+            border-radius: 5px;
+            z-index: 10;
+            font-size: 14px;
+        }
 
-    win.loadFile('index.html');
+        #hideSidebarButton {
+            right: -10px;
+        }
 
-    // Переопределяем prompt
-    win.webContents.executeJavaScript(`
-        window.prompt = async (message, defaultValue = '') => {
-            const { ipcRenderer } = require('electron');
-            const result = await ipcRenderer.invoke('show-prompt-dialog', message, defaultValue);
-            return result;
-        };
-    `);
+        #showSidebarButton {
+            left: 0;
+            display: none;
+        }
+
+        #sidebar.collapsed {
+            width: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #editorArea.expanded {
+            width: 100%;
+        }
+
+        #sidebar {
+            width: 20%;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            overflow-y: auto;
+            box-sizing: border-box;
+            transition: width 0.3s;
+        }
+
+        #editorArea {
+            width: 80%;
+            padding: 15px;
+            background-color: #ecf0f1;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+            transition: width 0.3s;
+        }
+
+        #folderName, #fileName {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ecf0f1;
+            text-align: center;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        #fileName {
+            color: #2c3e50;
+        }
+
+        #toolbar {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        #editor {
+            width: 100%;
+            height: calc(100% - 100px);
+            padding: 15px;
+            font-size: 16px;
+            color: #2c3e50;
+            background-color: #ffffff;
+            border: 1px solid #bdc3c7;
+            overflow-y: auto;
+            box-sizing: border-box;
+        }
+
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            background-color: #2980b9;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #3498db;
+        }
+
+        .file-item, .folder-item {
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .folder-item {
+            font-weight: bold;
+        }
+
+        .file-item:hover, .folder-item:hover {
+            background-color: #34495e;
+            color: #ecf0f1;
+        }
+
+        select, button.format-button {
+            padding: 8px 12px;
+            font-size: 14px;
+            background-color: #2c3e50;
+            color: white;
+            border: 1px solid #ecf0f1;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        select option {
+            background-color: #2c3e50;
+            color: white;
+        }
+
+        #editor::placeholder {
+            color: #bdc3c7;
+        }
+
+        .back-button {
+            display: none;
+            margin-left: 5px;
+            padding: 8px 16px;
+            font-size: 14px;
+            background-color: #c0392b;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+
+        .back-button:hover {
+            background-color: #e74c3c;
+        }
+
+        .upload-button {
+            background-color: #27ae60;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 16px;
+        }
+
+        .upload-button:hover {
+            background-color: #2ecc71;
+        }
+
+        .upload-input {
+            display: none;
+        }
+
+        .custom-audio-player {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            user-select: none;
+        }
+
+        .custom-audio-player button {
+            background-color: #2980b9;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .custom-audio-player button:hover {
+            background-color: #3498db;
+        }
+
+        .progress-container {
+            flex-grow: 1;
+            margin: 0 10px;
+            position: relative;
+            height: 5px;
+            background-color: #bdc3c7;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background-color: #2980b9;
+            width: 0;
+        }
+
+        .time {
+            font-size: 12px;
+            color: #ecf0f1;
+        }
+
+        @media (max-width: 1300px) {
+            body {
+                flex-direction: column;
+            }
+
+            #sidebar {
+                width: 100%;
+                height: 100vh;
+                position: absolute;
+                top: 0;
+                left: 0;
+                z-index: 100;
+            }
+
+            #editorArea {
+                display: none;
+                width: 100%;
+                height: 750px;
+            }
+
+            #editorArea.expanded {
+                display: block;
+            }
+
+            #showSidebarButton {
+                display: block;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #sidebar {
+                width: 100%;
+                height: 100vh;
+                position: absolute;
+                top: 0;
+                left: 0;
+            }
+
+            #editorArea {
+                width: 100%;
+                height: 750px;
+                display: none;
+            }
+
+            #editorArea.expanded {
+                display: block;
+            }
+
+            #showSidebarButton {
+                display: block;
+            }
+        }
+
+
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <!-- Новая кнопка для скрытия боковой панели -->
+        <button id="hideSidebarButton" onclick="toggleSidebar()">←</button>
+        <div id="folderName">No folder selected</div>
+        <div id="buttonContainer" style="display: flex; align-items: center;">
+            <button class="back-button" onclick="goBack()">Back</button>
+            <button onclick="selectFolder()">Open Folder</button>
+            <button onclick="createFile()">Create File</button>
+            <button onclick="deleteFile()">Delete File</button>
+        </div>
+        <div id="fileList"></div>
+    </div>
+
+    <!-- Новая кнопка для возврата боковой панели -->
+    <button id="showSidebarButton" style="display: none;" onclick="toggleSidebar()">→</button>
+
+    <script type="text/javascript">
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const editorArea = document.getElementById('editorArea');
+            const hideSidebarButton = document.getElementById('hideSidebarButton');
+            const showSidebarButton = document.getElementById('showSidebarButton');
+
+            if (window.innerWidth <= 768) {
+                // Для планшетов и мобильных устройств
+                if (sidebar.classList.contains('collapsed')) {
+                    sidebar.classList.remove('collapsed');
+                    sidebar.style.display = 'block';
+                    editorArea.style.display = 'none';
+                    hideSidebarButton.style.display = 'block';
+                    showSidebarButton.style.display = 'none';
+                } else {
+                    sidebar.classList.add('collapsed');
+                    sidebar.style.display = 'none';
+                    editorArea.style.display = 'block';
+                    hideSidebarButton.style.display = 'none';
+                    showSidebarButton.style.display = 'block';
+                }
+            } else {
+                // Для десктопов
+                if (sidebar.classList.contains('collapsed')) {
+                    sidebar.classList.remove('collapsed');
+                    editorArea.classList.remove('expanded');
+                    hideSidebarButton.style.display = 'block';
+                    showSidebarButton.style.display = 'none';
+                } else {
+                    sidebar.classList.add('collapsed');
+                    editorArea.classList.add('expanded');
+                    hideSidebarButton.style.display = 'none';
+                    showSidebarButton.style.display = 'block';
+                }
+            }
+        }
+
+
+    </script>
+
+    <div id="editorArea">
+        <div id="fileName">No file selected</div>
+        <div id="toolbar">
+            <button class="format-button" onclick="formatText('bold')">Bold</button>
+            <button class="format-button" onclick="formatText('italic')">Italic</button>
+            <button class="format-button" onclick="formatText('underline')">Underline</button>
+            <select onchange="formatText('fontName', this.value)">
+                <option value="Montserrat" style="font-family: 'Montserrat';">Montserrat</option>
+                <option value="Poppins" style="font-family: 'Poppins';">Poppins</option>
+                <option value="Times New Roman" style="font-family: 'Times New Roman';">Times New Roman</option>
+            </select>
+            <select onchange="formatText('fontSize', this.value)">
+                <option value="1">8px</option>
+                <option value="2">10px</option>
+                <option value="3">12px</option>
+                <option value="4" selected>14px</option>
+                <option value="5">18px</option>
+                <option value="6">24px</option>
+                <option value="7">36px</option>
+            </select>
+            <button onclick="saveFile()">Save File</button>
+            <label for="imageUpload" class="upload-button">Add Image</label>
+            <input id="imageUpload" class="upload-input" type="file" accept="image/*" onchange="addImage(event)">
+            <label for="audioUpload" class="upload-button">Add Audio</label>
+            <input id="audioUpload" class="upload-input" type="file" accept="audio/*" onchange="addAudio(event)">
+        </div>
+        <div id="editor" contenteditable="true" placeholder="Your text here..."></div>
+    </div>
+
+    <script>
+        let directoryHandle;
+        let currentFileHandle;
+        let currentFileName;
+        let previousDirectories = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedDirectory = localStorage.getItem('selectedDirectory');
+            if (savedDirectory) {
+                try {
+                    directoryHandle = JSON.parse(savedDirectory);
+                    document.getElementById('folderName').textContent = `Folder: ${directoryHandle.name}`;
+                    listFiles(directoryHandle);
+                } catch (error) {
+                    console.error('Error loading saved directory:', error);
+                }
+            }
+        });
+
+        async function selectFolder() {
+            try {
+                directoryHandle = await window.showDirectoryPicker();
+                document.getElementById('folderName').textContent = `Folder: ${directoryHandle.name}`;
+                previousDirectories = []; // Reset history when selecting a new root folder
+                listFiles(directoryHandle);
+                localStorage.setItem('selectedDirectory', JSON.stringify(directoryHandle));
+            } catch (error) {
+                console.error('Error selecting folder:', error);
+            }
+        }
+
+        async function listFiles(handle) {
+            try {
+                const fileList = document.getElementById('fileList');
+                fileList.innerHTML = '';
+                const folders = [];
+                const files = [];
+
+                for await (const entry of handle.values()) {
+                    if (entry.kind === 'directory') {
+                        folders.push(entry);
+                    } else if (entry.kind === 'file') {
+                        files.push(entry);
+                    }
+                }
+
+                folders.sort((a, b) => a.name.localeCompare(b.name));
+                files.sort((a, b) => a.name.localeCompare(b.name));
+
+                folders.forEach(entry => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'folder-item';
+                    itemDiv.textContent = entry.name;
+                    itemDiv.onclick = () => openFolder(entry);
+                    fileList.appendChild(itemDiv);
+                });
+
+                files.forEach(entry => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'file-item';
+                    itemDiv.textContent = entry.name;
+                    itemDiv.onclick = () => openFile(entry);
+                    fileList.appendChild(itemDiv);
+                });
+
+                document.querySelector('.back-button').style.display = previousDirectories.length > 0 ? 'block' : 'none';
+
+            } catch (error) {
+                console.error('Error listing files:', error);
+            }
+        }
+
+        async function openFolder(folderHandle) {
+            previousDirectories.push(directoryHandle);
+            directoryHandle = folderHandle;
+            document.getElementById('folderName').textContent = `Folder: ${folderHandle.name}`;
+            listFiles(folderHandle);
+        }
+
+        function goBack() {
+            if (previousDirectories.length > 0) {
+                directoryHandle = previousDirectories.pop();
+                document.getElementById('folderName').textContent = `Folder: ${directoryHandle.name}`;
+                listFiles(directoryHandle);
+            }
+        }
+
+       async function createFile() {
+    if (!directoryHandle) {
+        window.electronAPI.showAlert('Please select a folder first.');
+        return;
+    }
+
+    // Открываем кастомное окно prompt для ввода имени файла
+    window.electronAPI.openPrompt();
+
+    // Используем временную функцию для обработки события один раз
+    const handlePromptResponse = async (fileName) => {
+        if (fileName) {
+            try {
+                // Создаем новый файл с указанным именем
+                const newFileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
+                
+                // Открываем файл
+                await openFile(newFileHandle);
+                
+                // Обновляем список файлов
+                listFiles(directoryHandle);
+            } catch (error) {
+                console.error('Error creating file:', error);
+            } finally {
+                // После выполнения отписываемся от события
+                window.electronAPI.offPromptResponse(handlePromptResponse);
+            }
+        }
+    };
+
+    // Подписываемся на получение данных из prompt
+    window.electronAPI.oncePromptResponse(handlePromptResponse); // Используем одноразовую подписку
+
 }
 
-// Удаляем меню
-Menu.setApplicationMenu(null);
 
-app.whenReady().then(createWindow);
 
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
-});
+        async function deleteFile() {
+            if (!currentFileHandle) {
+                window.electronAPI.showAlert('Please select a file first.');
+                return;
+            }
 
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-    }
-});
-
-// Обработчик для кастомного prompt
-ipcMain.handle('show-prompt-dialog', async (event, message, defaultValue) => {
-    const promptWindow = new BrowserWindow({
-        width: 400,
-        height: 200,
-        resizable: false,
-        modal: true,
-        parent: BrowserWindow.getFocusedWindow(),
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
+            window.electronAPI.showConfirm(`Are you sure you want to delete ${currentFileHandle.name}?`).then(async (result) => {
+                if (result) {
+                    try {
+                        await directoryHandle.removeEntry(currentFileHandle.name);
+                        document.getElementById('editor').innerHTML = '';
+                        listFiles(directoryHandle);
+                    } catch (error) {
+                        console.error('Error deleting file:', error);
+                    }
+                }
+            });
         }
-    });
 
-    // Загружаем HTML для окна с полем ввода
-    promptWindow.loadURL(`data:text/html,
-        <html>
-        <body>
-            <h1>${message}</h1>
-            <input type="text" id="input" value="${defaultValue}" />
-            <button onclick="require('electron').ipcRenderer.send('prompt-response', document.getElementById('input').value)">OK</button>
-            <button onclick="require('electron').ipcRenderer.send('prompt-response', null)">Cancel</button>
-        </body>
-        </html>`);
 
-    return new Promise((resolve) => {
-        ipcMain.once('prompt-response', (event, result) => {
-            promptWindow.close();
-            resolve(result);
-        });
-    });
-});
+        async function openFile(fileHandle) {
+            currentFileHandle = fileHandle;
+            currentFileName = fileHandle.name;
+            document.getElementById('fileName').textContent = `File: ${fileHandle.name}`;
+            const file = await fileHandle.getFile();
+            const content = await file.text();
+            document.getElementById('editor').innerHTML = content;
+        }
+
+        async function saveFile() {
+            if (!currentFileHandle) {
+                window.electronAPI.showAlert('Please select a file first.');
+                return;
+            }
+
+            try {
+                const writableStream = await currentFileHandle.createWritable();
+                await writableStream.write(document.getElementById('editor').innerHTML);
+                await writableStream.close();
+                window.electronAPI.showAlert('File saved successfully.');
+            } catch (error) {
+                console.error('Error saving file:', error);
+            }
+        }
+
+
+        function formatText(command, value = null) {
+            document.execCommand(command, false, value);
+        }
+
+        function addImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.maxWidth = '100%';
+                    img.style.height = 'auto';
+                    document.getElementById('editor').appendChild(img);
+                    document.getElementById('editor').appendChild(document.createElement('br')); // Äîáàâëÿåì ïåðåíîñ ñòðîêè
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function addAudio(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const audioPlayer = document.createElement('div');
+                    audioPlayer.className = 'custom-audio-player';
+                    audioPlayer.setAttribute('contenteditable', 'false'); // Çàïðåò ðåäàêòèðîâàíèÿ
+                    audioPlayer.innerHTML = `
+                        <audio id="audio" src="${e.target.result}" ontimeupdate="updateProgress()"></audio>
+                        <button onclick="playAudio()">Play</button>
+                        <button onclick="pauseAudio()">Pause</button>
+                        <button onclick="stopAudio()">Stop</button>
+                        <div class="progress-container">
+                            <div class="progress-bar" id="progress-bar"></div>
+                        </div>
+                        <span class="time" id="current-time">0:00</span> / <span class="time" id="duration">0:00</span>
+                    `;
+                    document.getElementById('editor').appendChild(audioPlayer);
+                    document.getElementById('editor').appendChild(document.createElement('br')); // Äîáàâëÿåì ïåðåíîñ ñòðîêè
+
+                    const audio = document.getElementById('audio');
+                    audio.onloadedmetadata = function() {
+                        document.getElementById('duration').textContent = formatTime(audio.duration);
+                    };
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function playAudio() {
+            const audio = document.getElementById('audio');
+            if (audio) {
+                audio.play();
+            }
+        }
+
+        function pauseAudio() {
+            const audio = document.getElementById('audio');
+            if (audio) {
+                audio.pause();
+            }
+        }
+
+        function stopAudio() {
+            const audio = document.getElementById('audio');
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0; // Ñáðîñèòü âðåìÿ
+                updateProgress();
+            }
+        }
+
+        function updateProgress() {
+            const audio = document.getElementById('audio');
+            const progressBar = document.getElementById('progress-bar');
+            const currentTimeDisplay = document.getElementById('current-time');
+
+            if (audio) {
+                const progress = (audio.currentTime / audio.duration) * 100;
+                progressBar.style.width = progress + '%';
+                currentTimeDisplay.textContent = formatTime(audio.currentTime);
+            }
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+    </script>
+</body>
+</html>
