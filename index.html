@@ -535,19 +535,37 @@
             }
 
             try {
+                const editor = document.getElementById('editor');
+                
+                // Получаем текущее содержимое редактора
+                const content = editor.innerHTML;
+
+                // Сохраняем файл
                 const writableStream = await currentFileHandle.createWritable();
-                await writableStream.write(document.getElementById('editor').innerHTML);
+                await writableStream.write(content);
                 await writableStream.close();
+
+                // Показ сообщения об успешном сохранении
                 window.electronAPI.showAlert('File saved successfully.');
+
+                // Восстанавливаем редактируемость через короткую задержку
+                setTimeout(() => {
+                    editor.contentEditable = "true";
+                    editor.focus(); // Устанавливаем фокус
+                }, 100); // Даем системе время перед восстановлением редактирования
+
             } catch (error) {
                 console.error('Error saving file:', error);
             }
         }
 
 
+
+        // Пример функции форматирования текста
         function formatText(command, value = null) {
             document.execCommand(command, false, value);
         }
+
 
         function addImage(event) {
             const file = event.target.files[0];
@@ -565,63 +583,74 @@
             }
         }
 
+        let audioCounter = 0; // Счетчик для уникальных id
+
         function addAudio(event) {
             const file = event.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
+                    // Увеличиваем счетчик для каждого нового аудио
+                    const audioId = `audio${audioCounter}`;
+                    const progressBarId = `progress-bar${audioCounter}`;
+                    const currentTimeId = `current-time${audioCounter}`;
+                    const durationId = `duration${audioCounter}`;
+                    
                     const audioPlayer = document.createElement('div');
                     audioPlayer.className = 'custom-audio-player';
-                    audioPlayer.setAttribute('contenteditable', 'false'); // Çàïðåò ðåäàêòèðîâàíèÿ
+                    audioPlayer.setAttribute('contenteditable', 'false');
                     audioPlayer.innerHTML = `
-                        <audio id="audio" src="${e.target.result}" ontimeupdate="updateProgress()"></audio>
-                        <button onclick="playAudio()">Play</button>
-                        <button onclick="pauseAudio()">Pause</button>
-                        <button onclick="stopAudio()">Stop</button>
+                        <audio id="${audioId}" src="${e.target.result}" ontimeupdate="updateProgress('${audioId}', '${progressBarId}', '${currentTimeId}')"></audio>
+                        <button onclick="playAudio('${audioId}')">Play</button>
+                        <button onclick="pauseAudio('${audioId}')">Pause</button>
+                        <button onclick="stopAudio('${audioId}', '${progressBarId}', '${currentTimeId}')">Stop</button>
                         <div class="progress-container">
-                            <div class="progress-bar" id="progress-bar"></div>
+                            <div class="progress-bar" id="${progressBarId}"></div>
                         </div>
-                        <span class="time" id="current-time">0:00</span> / <span class="time" id="duration">0:00</span>
+                        <span class="time" id="${currentTimeId}">0:00</span> / <span class="time" id="${durationId}">0:00</span>
                     `;
                     document.getElementById('editor').appendChild(audioPlayer);
-                    document.getElementById('editor').appendChild(document.createElement('br')); // Äîáàâëÿåì ïåðåíîñ ñòðîêè
+                    document.getElementById('editor').appendChild(document.createElement('br'));
 
-                    const audio = document.getElementById('audio');
+                    const audio = document.getElementById(audioId);
                     audio.onloadedmetadata = function() {
-                        document.getElementById('duration').textContent = formatTime(audio.duration);
+                        document.getElementById(durationId).textContent = formatTime(audio.duration);
                     };
+
+                    // Увеличиваем счетчик для следующего аудио
+                    audioCounter++;
                 }
                 reader.readAsDataURL(file);
             }
         }
 
-        function playAudio() {
-            const audio = document.getElementById('audio');
+        function playAudio(audioId) {
+            const audio = document.getElementById(audioId);
             if (audio) {
                 audio.play();
             }
         }
 
-        function pauseAudio() {
-            const audio = document.getElementById('audio');
+        function pauseAudio(audioId) {
+            const audio = document.getElementById(audioId);
             if (audio) {
                 audio.pause();
             }
         }
 
-        function stopAudio() {
-            const audio = document.getElementById('audio');
+        function stopAudio(audioId, progressBarId, currentTimeId) {
+            const audio = document.getElementById(audioId);
             if (audio) {
                 audio.pause();
-                audio.currentTime = 0; // Ñáðîñèòü âðåìÿ
-                updateProgress();
+                audio.currentTime = 0;
+                updateProgress(audioId, progressBarId, currentTimeId); // Сбрасываем прогресс
             }
         }
 
-        function updateProgress() {
-            const audio = document.getElementById('audio');
-            const progressBar = document.getElementById('progress-bar');
-            const currentTimeDisplay = document.getElementById('current-time');
+        function updateProgress(audioId, progressBarId, currentTimeId) {
+            const audio = document.getElementById(audioId);
+            const progressBar = document.getElementById(progressBarId);
+            const currentTimeDisplay = document.getElementById(currentTimeId);
 
             if (audio) {
                 const progress = (audio.currentTime / audio.duration) * 100;
@@ -635,6 +664,7 @@
             const secs = Math.floor(seconds % 60);
             return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
         }
+
     </script>
 </body>
 </html>
