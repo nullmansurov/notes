@@ -25,7 +25,9 @@
       "index.html",
       "assets/fv_p9.ico",
       "assets/icon.icns",
-      "assets/icon.png"
+      "assets/icon.png",
+      "prompt.html",
+      "preload.js"
     ],
     "win": {
       "target": [
