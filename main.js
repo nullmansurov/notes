@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const fs = require('fs');
 const path = require('path');
 
 let mainWindow;
@@ -12,6 +13,7 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js')
         },
         icon: path.join(__dirname, 'favicon.ico'),
+        alwaysOnTop: true,
         autoHideMenuBar: true // Убираем меню из главного окна
     });
 
@@ -64,22 +66,25 @@ ipcMain.handle('show-confirm', (event, message) => {
     });
 });
 
-// Открытие окна Prompt для разных типов
 ipcMain.on('open-prompt-window', (event, promptType) => {
-    if (promptType === 'url') {
-        createPromptWindow('promptURL.html'); // Загружаем HTML для URL
-    } else {
-        createPromptWindow('prompt.html'); // Загружаем общий HTML
+    createPromptWindow('prompt.html', promptType);
+});
+
+ipcMain.on('prompt-input', (event, input) => {
+    mainWindow.webContents.send('prompt-response', input); // Отправляем введенные данные обратно в основное окно
+    if (promptWindow) {
+        promptWindow.close(); // Закрываем окно после получения ответа
     }
 });
 
-// Получение данных из prompt
-ipcMain.on('prompt-input', (event, input) => {
-    // Отправляем данные обратно в главное окно
-    mainWindow.webContents.send('prompt-response', input);
-    // Закрываем окно prompt после получения данных
+ipcMain.on('rename-prompt-window', (event, promptType) => {
+    createPromptWindow('rename_prompt.html', promptType);
+});
+
+ipcMain.on('prompt-rename', (event, input) => {
+    mainWindow.webContents.send('rename-response', input); // Отправляем введенные данные обратно в основное окно
     if (promptWindow) {
-        promptWindow.close();
+        promptWindow.close(); // Закрываем окно после получения ответа
     }
 });
 
@@ -94,5 +99,84 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
         createWindow();
+    }
+});
+
+// Обработчик для выбора папки
+ipcMain.handle('select-folder', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+        properties: ['openDirectory']
+    });
+
+    // Проверяем, был ли выбран путь
+    if (result.canceled || result.filePaths.length === 0) {
+        return null; // Если не выбрано, возвращаем null
+    }
+    
+    return result.filePaths[0]; // Возвращаем путь к выбранной папке
+});
+
+
+// Список файлов и папок в выбранной директории
+ipcMain.handle('list-files', async (event, dirPath) => {
+    return fs.readdirSync(dirPath, { withFileTypes: true }).map(dirent => ({
+        name: dirent.name,
+        isDirectory: dirent.isDirectory()
+    }));
+});
+
+// Обработчик для открытия файла
+ipcMain.handle('open-file', async (event, filePath) => {
+    try {
+        const content = fs.readFileSync(filePath, 'utf8');
+        return content;
+    } catch (error) {
+        console.error('Error opening file:', error);
+        throw error;
+    }
+});
+
+// Обработчик для создания файла
+ipcMain.handle('create-file', async (event, dirPath, fileName) => {
+    try {
+        const filePath = path.join(dirPath, fileName);
+        fs.writeFileSync(filePath, '', 'utf8'); // Создаем пустой файл
+        return filePath;
+    } catch (error) {
+        console.error('Error creating file:', error);
+        throw error;
+    }
+});
+
+// Обработчик для удаления файла
+ipcMain.handle('delete-file', async (event, filePath) => {
+    try {
+        fs.unlinkSync(filePath); // Удаляем файл
+        return true;
+    } catch (error) {
+        console.error('Error deleting file:', error);
+        throw error;
+    }
+});
+
+// Обработчик для сохранения файла
+ipcMain.handle('save-file', async (event, filePath, content) => {
+    try {
+        fs.writeFileSync(filePath, content, 'utf8'); // Сохраняем контент в файл
+        return true;
+    } catch (error) {
+        console.error('Error saving file:', error);
+        throw error;
+    }
+});
+
+// Обработчик для переименования файла
+ipcMain.handle('rename-file', async (event, oldFilePath, newFilePath) => {
+    try {
+        fs.renameSync(oldFilePath, newFilePath); // Переименовываем файл
+        return true;
+    } catch (error) {
+        console.error('Error renaming file:', error);
+        throw error;
     }
 });

@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-    <h2>Enter Name:</h2>
-    <input type="text" id="promptInput" />
+    <h2>Rename File:</h2>
+    <input type="text" id="promptrename" />
     <button id="submitButton">Ok</button>
 
     <script>
         // Отправляем данные в основной процесс и закрываем окно
         document.getElementById('submitButton').addEventListener('click', () => {
-            const input = document.getElementById('promptInput').value;
+            const input = document.getElementById('promptrename').value;
             if (input) {
-                window.electronAPI.sendPromptInput(input); // Отправляем данные
+                window.electronAPI.sendPromptInput2(input); // Отправляем данные
             }
         });
     </script>

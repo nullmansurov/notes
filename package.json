@@ -1,6 +1,6 @@
 {
   "name": "notes",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A notes",
   "author": {
   "name": "Scyload",
@@ -27,6 +27,12 @@
       "assets/icon.icns",
       "assets/icon.png",
       "prompt.html",
+      "rename_prompt.html",
+      "image.png",
+      "audio.png",
+      "back.png",
+      "create.png",
+      "folder.png",
       "preload.js"
     ],
     "win": {

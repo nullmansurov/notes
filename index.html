@@ -7,6 +7,7 @@
     <link rel="icon" href="fav.ico" type="image/x-icon">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Poppins:wght@400;700&display=swap" rel="stylesheet">
 <style>
+        /* Ваши исходные стили */
         body {
             font-family: Montserrat, sans-serif;
             margin: 0;
@@ -285,7 +286,37 @@
             }
         }
 
+        /* Добавленные стили для изменения размера изображений и размещения текста рядом */
+        .resizable-container {
+            display: inline-block; /* Позволяет тексту располагаться рядом с изображением */
+            position: relative;
+            max-width: 100%;
+            float: left; /* Чтобы текст мог обтекать изображение */
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
 
+        .resizable-container img {
+            display: block;
+            width: 100%; /* Задаем начальную ширину на 100% для контейнера */
+            height: auto; /* Поддержка пропорций изначально */
+        }
+
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #000;
+            bottom: 0;
+            right: 0;
+            cursor: se-resize;
+        }
+
+        .text-content {
+            display: block; /* Это обеспечит правильное поведение текста вокруг изображения */
+            min-width: 100%;
+            clear: both; /* Убирает возможные плавающие элементы, чтобы текст начинался с новой строки */
+        }
     </style>
 </head>
 <body>
@@ -295,9 +326,15 @@
         <div id="folderName">No folder selected</div>
         <div id="buttonContainer" style="display: flex; align-items: center;">
             <button class="back-button" onclick="goBack()">Back</button>
-            <button onclick="selectFolder()">Open Folder</button>
-            <button onclick="createFile()">Create File</button>
-            <button onclick="deleteFile()">Delete File</button>
+            <button onclick="selectFolder()">
+                <img src="folder.png" alt="Open File" style="width: 20px; height: 20px;">
+            </button>
+            <button onclick="createFile()">
+                <img src="create.png" alt="Create File" style="width: 20px; height: 20px;">
+            </button>
+            <button onclick="goBack()">
+                <img src="back.png" alt="Back" style="width: 20px; height: 20px;">
+            </button>
         </div>
         <div id="fileList"></div>
     </div>
@@ -366,305 +403,359 @@
                 <option value="6">24px</option>
                 <option value="7">36px</option>
             </select>
+            <button onclick="renameFile()">Rename</button>
+            <button onclick="deleteFile()">Delete File</button>
             <button onclick="saveFile()">Save File</button>
-            <label for="imageUpload" class="upload-button">Add Image</label>
+            <label for="imageUpload" class="upload-button">
+                <img src="image.png" alt="Add Image" style="width: 20px; height: 20px;">
+            </label>
             <input id="imageUpload" class="upload-input" type="file" accept="image/*" onchange="addImage(event)">
-            <label for="audioUpload" class="upload-button">Add Audio</label>
+            <label for="audioUpload" class="upload-button">
+                <img src="audio.png" alt="Add Audio" style="width: 20px; height: 20px;">
+            </label>
             <input id="audioUpload" class="upload-input" type="file" accept="audio/*" onchange="addAudio(event)">
         </div>
         <div id="editor" contenteditable="true" placeholder="Your text here..."></div>
     </div>
+    <script type="text/javascript">
+    let currentFilePath;
+    let currentDirectory = '';  // Текущая папка
+    let directoryHistory = [];  // История директорий
 
-    <script>
-        let directoryHandle;
-        let currentFileHandle;
-        let currentFileName;
-        let previousDirectories = [];
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedDirectory = localStorage.getItem('selectedDirectory');
-            if (savedDirectory) {
-                try {
-                    directoryHandle = JSON.parse(savedDirectory);
-                    document.getElementById('folderName').textContent = `Folder: ${directoryHandle.name}`;
-                    listFiles(directoryHandle);
-                } catch (error) {
-                    console.error('Error loading saved directory:', error);
-                }
-            }
-        });
-
-        async function selectFolder() {
-            try {
-                directoryHandle = await window.showDirectoryPicker();
-                document.getElementById('folderName').textContent = `Folder: ${directoryHandle.name}`;
-                previousDirectories = []; // Reset history when selecting a new root folder
-                listFiles(directoryHandle);
-                localStorage.setItem('selectedDirectory', JSON.stringify(directoryHandle));
-            } catch (error) {
-                console.error('Error selecting folder:', error);
-            }
+    async function selectFolder() {
+        const selectedFolder = await window.electronAPI.selectFolder();
+        
+        // Проверяем, был ли выбран путь
+        if (!selectedFolder) {
+            console.log("Папка не выбрана. Текущая директория не изменена.");
+            return; // Если не выбрано, просто выходим из функции
         }
 
-        async function listFiles(handle) {
-            try {
-                const fileList = document.getElementById('fileList');
-                fileList.innerHTML = '';
-                const folders = [];
-                const files = [];
-
-                for await (const entry of handle.values()) {
-                    if (entry.kind === 'directory') {
-                        folders.push(entry);
-                    } else if (entry.kind === 'file') {
-                        files.push(entry);
-                    }
-                }
-
-                folders.sort((a, b) => a.name.localeCompare(b.name));
-                files.sort((a, b) => a.name.localeCompare(b.name));
-
-                folders.forEach(entry => {
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'folder-item';
-                    itemDiv.textContent = entry.name;
-                    itemDiv.onclick = () => openFolder(entry);
-                    fileList.appendChild(itemDiv);
-                });
-
-                files.forEach(entry => {
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = 'file-item';
-                    itemDiv.textContent = entry.name;
-                    itemDiv.onclick = () => openFile(entry);
-                    fileList.appendChild(itemDiv);
-                });
-
-                document.querySelector('.back-button').style.display = previousDirectories.length > 0 ? 'block' : 'none';
-
-            } catch (error) {
-                console.error('Error listing files:', error);
-            }
-        }
-
-        async function openFolder(folderHandle) {
-            previousDirectories.push(directoryHandle);
-            directoryHandle = folderHandle;
-            document.getElementById('folderName').textContent = `Folder: ${folderHandle.name}`;
-            listFiles(folderHandle);
-        }
-
-        function goBack() {
-            if (previousDirectories.length > 0) {
-                directoryHandle = previousDirectories.pop();
-                document.getElementById('folderName').textContent = `Folder: ${directoryHandle.name}`;
-                listFiles(directoryHandle);
-            }
-        }
-
-       async function createFile() {
-    if (!directoryHandle) {
-        window.electronAPI.showAlert('Please select a folder first.');
-        return;
+        currentDirectory = selectedFolder;
+        localStorage.setItem('lastSelectedFolder', currentDirectory);
+        directoryHistory = [];  // Очищаем историю при выборе новой папки
+        document.getElementById('folderName').textContent = `Folder: ${currentDirectory}`;
+        listFiles();
     }
 
-    // Открываем кастомное окно prompt для ввода имени файла
-    window.electronAPI.openPrompt();
+    async function openSavedFolder() {
+        const lastSelectedFolder = localStorage.getItem('lastSelectedFolder');
 
-    // Используем временную функцию для обработки события один раз
-    const handlePromptResponse = async (fileName) => {
-        if (fileName) {
-            try {
-                // Создаем новый файл с указанным именем
-                const newFileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
-                
-                // Открываем файл
-                await openFile(newFileHandle);
-                
-                // Обновляем список файлов
-                listFiles(directoryHandle);
-            } catch (error) {
-                console.error('Error creating file:', error);
-            } finally {
-                // После выполнения отписываемся от события
-                window.electronAPI.offPromptResponse(handlePromptResponse);
-            }
-        }
-    };
-
-    // Подписываемся на получение данных из prompt
-    window.electronAPI.oncePromptResponse(handlePromptResponse); // Используем одноразовую подписку
-
-}
-
-
-
-        async function deleteFile() {
-            if (!currentFileHandle) {
-                window.electronAPI.showAlert('Please select a file first.');
-                return;
-            }
-
-            window.electronAPI.showConfirm(`Are you sure you want to delete ${currentFileHandle.name}?`).then(async (result) => {
-                if (result) {
-                    try {
-                        await directoryHandle.removeEntry(currentFileHandle.name);
-                        document.getElementById('editor').innerHTML = '';
-                        listFiles(directoryHandle);
-                    } catch (error) {
-                        console.error('Error deleting file:', error);
-                    }
-                }
-            });
+        // Если нет сохранённой папки
+        if (!lastSelectedFolder) {
+            console.log("Нет сохранённой папки в localStorage.");
+            return;
         }
 
+        // Устанавливаем текущую директорию на сохранённую
+        currentDirectory = lastSelectedFolder;
 
-        async function openFile(fileHandle) {
-            currentFileHandle = fileHandle;
-            currentFileName = fileHandle.name;
-            document.getElementById('fileName').textContent = `File: ${fileHandle.name}`;
-            const file = await fileHandle.getFile();
-            const content = await file.text();
-            document.getElementById('editor').innerHTML = content;
+        // Обновляем интерфейс с названием папки
+        document.getElementById('folderName').textContent = `Folder: ${currentDirectory}`;
+
+        // Обновляем список файлов в папке
+        await listFiles();
+    }
+
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+        openSavedFolder(); // Автоматически открываем сохранённую папку при запуске
+    });
+
+    async function listFiles() {
+        const fileList = document.getElementById('fileList');
+        fileList.innerHTML = ''; // Очищаем список
+
+        const files = await window.electronAPI.listFiles(currentDirectory);
+
+        const folderItems = files.filter(file => file.isDirectory); // Папки
+        const fileItems = files.filter(file => !file.isDirectory);  // Файлы
+
+        folderItems.forEach(folder => {
+            const item = document.createElement('div');
+            item.textContent = folder.name;
+            item.className = 'folder-item';
+            item.onclick = () => openFolder(folder.name);
+            fileList.appendChild(item);
+        });
+
+        fileItems.forEach(file => {
+            const item = document.createElement('div');
+            item.textContent = file.name;
+            item.className = 'file-item';
+            item.onclick = () => openFile(file.name);
+            fileList.appendChild(item);
+        });
+    }
+
+    async function openFile(fileName) {
+        currentFilePath = `${currentDirectory}/${fileName}`;
+        const content = await window.electronAPI.openFile(currentFilePath);
+        document.getElementById('fileName').textContent = `File: ${fileName}`;
+        document.getElementById('editor').innerHTML = content;
+    }
+
+    async function openFolder(folderName) {
+        // Сохраняем текущую директорию в историю
+        directoryHistory.push(currentDirectory);
+        currentDirectory = `${currentDirectory}/${folderName}`;
+        document.getElementById('folderName').textContent = `Folder: ${currentDirectory}`;
+        listFiles();
+    }
+
+    // Функция для возвращения в предыдущую папку
+    async function goBack() {
+        if (directoryHistory.length > 0) {
+            currentDirectory = directoryHistory.pop(); // Берём предыдущую папку из истории
+            document.getElementById('folderName').textContent = `Folder: ${currentDirectory}`;
+            listFiles(); // Обновляем список файлов
+        }
+    }
+
+    async function createFile() {
+        if (!currentDirectory) {
+            alert('Please select a folder first.');
+            return;
         }
 
-        async function saveFile() {
-            if (!currentFileHandle) {
-                window.electronAPI.showAlert('Please select a file first.');
-                return;
+        // Открываем окно prompt
+        window.electronAPI.openPrompt('create-file');
+
+        // Используем одноразовый обработчик
+        window.electronAPI.onPromptResponse(async (fileName) => {
+            if (fileName) {
+                await window.electronAPI.createFile(currentDirectory, fileName);
+                listFiles(); // Обновляем список файлов после создания
             }
+        });
+    }
 
-            try {
-                const editor = document.getElementById('editor');
-                
-                // Получаем текущее содержимое редактора
-                const content = editor.innerHTML;
-
-                // Сохраняем файл
-                const writableStream = await currentFileHandle.createWritable();
-                await writableStream.write(content);
-                await writableStream.close();
-
-                // Показ сообщения об успешном сохранении
-                window.electronAPI.showAlert('File saved successfully.');
-
-                // Восстанавливаем редактируемость через короткую задержку
-                setTimeout(() => {
-                    editor.contentEditable = "true";
-                    editor.focus(); // Устанавливаем фокус
-                }, 100); // Даем системе время перед восстановлением редактирования
-
-            } catch (error) {
-                console.error('Error saving file:', error);
-            }
+    async function createFolder() {
+        if (!currentDirectory) {
+            alert('Please select a folder first.');
+            return;
         }
 
+        // Открываем prompt
+        window.electronAPI.openPrompt('create-folder');
+
+        // Используем одноразовый обработчик
+        window.electronAPI.onPromptResponse(async (folderName) => {
+            if (folderName) {
+                await window.electronAPI.createFolder(currentDirectory, folderName);
+                listFiles(); // Обновляем список файлов после создания
+            }
+        });
+    }
 
 
+    async function deleteFile() {
+        if (!currentFilePath) {
+            alert('Please select a file first.');
+            return;
+        }
+
+        const confirmed = confirm(`Are you sure you want to delete ${currentFilePath}?`);
+        if (confirmed) {
+            await window.electronAPI.deleteFile(currentFilePath);
+            document.getElementById('editor').innerHTML = '';
+            document.getElementById('fileName').textContent = 'File: None';
+            listFiles(); // Обновляем список файлов
+        }
+    }
+
+    async function saveFile() {
+        if (!currentFilePath) {
+            alert('Please select a file first.');
+            return;
+        }
+
+        const content = document.getElementById('editor').innerHTML;
+        await window.electronAPI.saveFile(currentFilePath, content);
+        alert('File saved successfully.');
+    }
         // Пример функции форматирования текста
         function formatText(command, value = null) {
             document.execCommand(command, false, value);
         }
 
+    async function renameFile() {
+        if (!currentFilePath) {
+            alert('Please select a file first.');
+            return;
+        }
 
-        function addImage(event) {
+        // Открываем кастомное окно prompt для ввода нового имени файла
+        window.electronAPI.openRename('rename-file');  // Используем 'rename-file' как тип запроса
+
+        // Используем одноразовый обработчик для получения ответа
+        window.electronAPI.onRenameResponse(async (newFileName) => {
+            if (newFileName) {
+                const newFilePath = `${currentDirectory}/${newFileName}`;
+
+                // Отправляем запрос на переименование файла
+                await window.electronAPI.renameFile(currentFilePath, newFilePath);
+
+                // Обновляем текущий путь файла и интерфейс
+                currentFilePath = newFilePath;
+                document.getElementById('fileName').textContent = `File: ${newFileName}`;
+                listFiles(); // Обновляем список файлов
+            } else {
+                alert('Please enter a valid file name.');
+            }
+        });
+    }
+
+
+
+
+    </script>
+     <script>
+        // Добавление картинки с возможностью изменения размера
+       function addImage(event) {
             const file = event.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
+                    const container = document.createElement('div');
+                    container.className = 'resizable-container';
+
                     const img = document.createElement('img');
                     img.src = e.target.result;
-                    img.style.maxWidth = '100%';
-                    img.style.height = 'auto';
-                    document.getElementById('editor').appendChild(img);
-                    document.getElementById('editor').appendChild(document.createElement('br')); // Äîáàâëÿåì ïåðåíîñ ñòðîêè
-                }
+
+                    // Добавление изображения в контейнер
+                    container.appendChild(img);
+
+                    // Добавление "ручки" для изменения размера
+                    const resizeHandle = document.createElement('div');
+                    resizeHandle.className = 'resize-handle';
+                    container.appendChild(resizeHandle);
+
+                    // Вставляем контейнер с изображением в редактор
+                    document.getElementById('editor').appendChild(container);
+
+                    // Добавляем три пустые строки после изображения
+                    for (let i = 0; i < 3; i++) {
+                        document.getElementById('editor').appendChild(document.createElement('br'));
+                    }
+
+                    // Инициализация изменения размера
+                    resizeHandle.addEventListener('mousedown', initResize);
+                };
                 reader.readAsDataURL(file);
             }
         }
 
-        let audioCounter = 0; // Счетчик для уникальных id
 
-        function addAudio(event) {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    // Увеличиваем счетчик для каждого нового аудио
-                    const audioId = `audio${audioCounter}`;
-                    const progressBarId = `progress-bar${audioCounter}`;
-                    const currentTimeId = `current-time${audioCounter}`;
-                    const durationId = `duration${audioCounter}`;
-                    
-                    const audioPlayer = document.createElement('div');
-                    audioPlayer.className = 'custom-audio-player';
-                    audioPlayer.setAttribute('contenteditable', 'false');
-                    audioPlayer.innerHTML = `
-                        <audio id="${audioId}" src="${e.target.result}" ontimeupdate="updateProgress('${audioId}', '${progressBarId}', '${currentTimeId}')"></audio>
-                        <button onclick="playAudio('${audioId}')">Play</button>
-                        <button onclick="pauseAudio('${audioId}')">Pause</button>
-                        <button onclick="stopAudio('${audioId}', '${progressBarId}', '${currentTimeId}')">Stop</button>
-                        <div class="progress-container">
-                            <div class="progress-bar" id="${progressBarId}"></div>
-                        </div>
-                        <span class="time" id="${currentTimeId}">0:00</span> / <span class="time" id="${durationId}">0:00</span>
-                    `;
-                    document.getElementById('editor').appendChild(audioPlayer);
-                    document.getElementById('editor').appendChild(document.createElement('br'));
+       function initResize(event) {
+            const container = event.target.parentElement;
+            const img = container.querySelector('img');
+            const aspectRatio = img.naturalWidth / img.naturalHeight; // Соотношение сторон
 
-                    const audio = document.getElementById(audioId);
-                    audio.onloadedmetadata = function() {
-                        document.getElementById(durationId).textContent = formatTime(audio.duration);
-                    };
+            const startX = event.clientX;
+            const startWidth = img.offsetWidth;
 
-                    // Увеличиваем счетчик для следующего аудио
-                    audioCounter++;
-                }
-                reader.readAsDataURL(file);
+            function resize(event) {
+                const newWidth = startWidth + (event.clientX - startX);
+                const newHeight = newWidth / aspectRatio; // Высчитываем высоту, чтобы сохранить пропорции
+                img.style.width = `${newWidth}px`;
+                img.style.height = `${newHeight}px`;
             }
-        }
 
-        function playAudio(audioId) {
-            const audio = document.getElementById(audioId);
-            if (audio) {
-                audio.play();
+            function stopResize() {
+                window.removeEventListener('mousemove', resize);
+                window.removeEventListener('mouseup', stopResize);
             }
-        }
 
-        function pauseAudio(audioId) {
-            const audio = document.getElementById(audioId);
-            if (audio) {
-                audio.pause();
-            }
-        }
-
-        function stopAudio(audioId, progressBarId, currentTimeId) {
-            const audio = document.getElementById(audioId);
-            if (audio) {
-                audio.pause();
-                audio.currentTime = 0;
-                updateProgress(audioId, progressBarId, currentTimeId); // Сбрасываем прогресс
-            }
-        }
-
-        function updateProgress(audioId, progressBarId, currentTimeId) {
-            const audio = document.getElementById(audioId);
-            const progressBar = document.getElementById(progressBarId);
-            const currentTimeDisplay = document.getElementById(currentTimeId);
-
-            if (audio) {
-                const progress = (audio.currentTime / audio.duration) * 100;
-                progressBar.style.width = progress + '%';
-                currentTimeDisplay.textContent = formatTime(audio.currentTime);
-            }
-        }
-
-        function formatTime(seconds) {
-            const minutes = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+            window.addEventListener('mousemove', resize);
+            window.addEventListener('mouseup', stopResize);
         }
 
     </script>
+
+   <script>
+    // добавления аудио
+    function addAudio(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const editor = document.getElementById('editor');
+                const existingAudios = editor.querySelectorAll('audio').length;
+
+                // Увеличиваем счетчик для каждого нового аудио с учетом уже существующих
+                const audioId = `audio${existingAudios}`;
+                const progressBarId = `progress-bar${existingAudios}`;
+                const currentTimeId = `current-time${existingAudios}`;
+                const durationId = `duration${existingAudios}`;
+                
+                const audioPlayer = document.createElement('div');
+                audioPlayer.className = 'custom-audio-player';
+                audioPlayer.setAttribute('contenteditable', 'false');
+                audioPlayer.innerHTML = `
+                    <audio id="${audioId}" src="${e.target.result}" ontimeupdate="updateProgress('${audioId}', '${progressBarId}', '${currentTimeId}')"></audio>
+                    <button onclick="playAudio('${audioId}')">Play</button>
+                    <button onclick="pauseAudio('${audioId}')">Pause</button>
+                    <button onclick="stopAudio('${audioId}', '${progressBarId}', '${currentTimeId}')">Stop</button>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="${progressBarId}"></div>
+                    </div>
+                    <span class="time" id="${currentTimeId}">0:00</span> / <span class="time" id="${durationId}">0:00</span>
+                `;
+                editor.appendChild(audioPlayer);
+                editor.appendChild(document.createElement('br'));
+
+                const audio = document.getElementById(audioId);
+                audio.onloadedmetadata = function() {
+                    document.getElementById(durationId).textContent = formatTime(audio.duration);
+                };
+            }
+            reader.readAsDataURL(file);
+        }
+    }
+
+    function playAudio(audioId) {
+        const audio = document.getElementById(audioId);
+        if (audio) {
+            audio.play();
+        }
+    }
+
+    function pauseAudio(audioId) {
+        const audio = document.getElementById(audioId);
+        if (audio) {
+            audio.pause();
+        }
+    }
+
+    function stopAudio(audioId, progressBarId, currentTimeId) {
+        const audio = document.getElementById(audioId);
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+            updateProgress(audioId, progressBarId, currentTimeId); // Сбрасываем прогресс
+        }
+    }
+
+    function updateProgress(audioId, progressBarId, currentTimeId) {
+        const audio = document.getElementById(audioId);
+        const progressBar = document.getElementById(progressBarId);
+        const currentTimeDisplay = document.getElementById(currentTimeId);
+
+        if (audio) {
+            const progress = (audio.currentTime / audio.duration) * 100;
+            progressBar.style.width = progress + '%';
+            currentTimeDisplay.textContent = formatTime(audio.currentTime);
+        }
+    }
+
+    function formatTime(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${minutes}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+</script>
+
 </body>
 </html>
