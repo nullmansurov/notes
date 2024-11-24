@@ -13,8 +13,7 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js')
         },
         icon: path.join(__dirname, 'favicon.ico'),
-        alwaysOnTop: true,
-        autoHideMenuBar: true // Убираем меню из главного окна
+        autoHideMenuBar: true
     });
 
     mainWindow.loadFile('index.html');
